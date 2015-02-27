@@ -1,5 +1,6 @@
 import cgi
 import json
+from treq._utils import default_reactor
 
 from twisted.internet.defer import Deferred, succeed
 
@@ -40,7 +41,7 @@ class _BodyCollector(Protocol):
             self.finished.errback(reason)
 
 
-def collect(response, collector):
+def collect(response, request_kwargs, collector):
     """
     Incrementally collect the body of the response.
 
@@ -58,10 +59,20 @@ def collect(response, collector):
 
     d = Deferred()
     response.deliverBody(_BodyCollector(d, collector))
+    if request_kwargs.get('timeout'):
+        delayedCall = default_reactor(request_kwargs.get('reactor')).callLater(
+            request_kwargs.get('timeout'), d.cancel)
+
+        def gotResult(result):
+            if delayedCall.active():
+                delayedCall.cancel()
+            return result
+
+        d.addBoth(gotResult)
     return d
 
 
-def content(response):
+def content(response, request_kwargs):
     """
     Read the contents of an HTTP response.
 
@@ -73,12 +84,12 @@ def content(response):
     :rtype: Deferred that fires with the content as a str.
     """
     _content = []
-    d = collect(response, _content.append)
+    d = collect(response, request_kwargs, _content.append)
     d.addCallback(lambda _: ''.join(_content))
     return d
 
 
-def json_content(response):
+def json_content(response, request_kwargs):
     """
     Read the contents of an HTTP response and attempt to decode it as JSON.
 
@@ -89,12 +100,12 @@ def json_content(response):
 
     :rtype: Deferred that fires with the decoded JSON.
     """
-    d = content(response)
+    d = content(response, request_kwargs)
     d.addCallback(json.loads)
     return d
 
 
-def text_content(response, encoding='ISO-8859-1'):
+def text_content(response, request_kwargs, encoding='ISO-8859-1'):
     """
     Read the contents of an HTTP response and decode it with an appropriate
     charset, which may be guessed from the ``Content-Type`` header.
@@ -112,6 +123,6 @@ def text_content(response, encoding='ISO-8859-1'):
 
         return c.decode(encoding)
 
-    d = content(response)
+    d = content(response, request_kwargs)
     d.addCallback(_decode_content)
     return d

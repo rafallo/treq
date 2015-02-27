@@ -7,18 +7,19 @@ from treq.content import content, json_content, text_content
 
 
 class _Response(proxyForInterface(IResponse)):
-    def __init__(self, original, cookiejar):
+    def __init__(self, original, cookiejar, request_kwargs):
         self.original = original
         self._cookiejar = cookiejar
+        self.request_kwargs = request_kwargs
 
     def content(self):
-        return content(self.original)
+        return content(self.original, self.request_kwargs)
 
     def json(self, *args, **kwargs):
-        return json_content(self.original, *args, **kwargs)
+        return json_content(self.original, self.request_kwargs, *args, **kwargs)
 
     def text(self, *args, **kwargs):
-        return text_content(self.original, *args, **kwargs)
+        return text_content(self.original, self.request_kwargs, *args, **kwargs)
 
     def history(self):
         if not hasattr(self, "previousResponse"):

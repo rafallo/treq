@@ -50,7 +50,7 @@ class _BodyBufferingProtocol(proxyForInterface(IProtocol)):
 
 
 class _BufferedResponse(proxyForInterface(IResponse)):
-    def __init__(self, original):
+    def __init__(self, original, request_kwargs=None):
         self.original = original
         self._buffer = []
         self._waiters = []
@@ -199,9 +199,9 @@ class HTTPClient(object):
             d.addBoth(gotResult)
 
         if not kwargs.get('unbuffered', False):
-            d.addCallback(_BufferedResponse)
+            d.addCallback(_BufferedResponse, kwargs)
 
-        return d.addCallback(_Response, cookies)
+        return d.addCallback(_Response, cookies, kwargs)
 
 
 def _convert_params(params):
